@@ -1,6 +1,12 @@
+import retriever
 from reader.predictor import Predictor, QuestionContextInput
 
 
+def test_retriever():
+    results = retriever.find_relevant_documents("thủ đô của Việt Nam là gì?")
+    print(results)
+    
+    
 def test_reader():
     model_checkpoint_path = "./model"
     predictor = Predictor(model_checkpoint_path)
