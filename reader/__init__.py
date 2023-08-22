@@ -1,9 +1,11 @@
-from rank_bm25 import BM25Okapi  # First, install: pip install numpy rank-bm25
 import pickle
+import time
 
-library_file = 'wiki_clean_new.txt'
+from rank_bm25 import BM25Okapi
 
-with open(library_file, 'r', encoding='utf-8') as file:
+from config import DATA_PATH
+
+with open(DATA_PATH, 'r', encoding='utf-8') as file:
     library = file.read().split("=====================================\n")
 library = [section.lower() for section in library]
 
@@ -31,14 +33,37 @@ except FileNotFoundError:
     with open('bm25_model.pkl', 'wb') as model_file:
         pickle.dump(bm25, model_file)
 
-query = "quảng trường duyệt binh"
 
-scores = bm25.get_scores(query.split())
-ranked_documents = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+def get_document_by_id(doc_id) -> dict:
+    return {'title': titles[doc_id], 'content': contents[doc_id]}
 
-ranking_file = 'ranking.txt'
-with open(ranking_file, 'w', encoding='utf-8') as file:
-    for doc_id, score in ranked_documents:
-        file.write(f"Document {doc_id}: Score {score}\n")
 
-print("Ranking file has been created: ranking.txt")
+def find_relevant_documents(query, k=5) -> list:
+    t = time.time()
+    query = query.lower()
+    scores = bm25.get_scores(query.split())
+    ranked_documents = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+    top_documents = ranked_documents[:k]
+
+    result = []
+    for doc_id, score in top_documents:
+        tmp = {'doc_id': doc_id, 'score': score}
+        tmp.update(get_document_by_id(doc_id))
+        result.append(tmp)
+    print(f'Query time: {time.time() - t}')
+    return result
+
+
+#
+# if __name__ == '__main__':
+#     query = "quảng trường duyệt binh"
+#
+#     scores = bm25.get_scores(query.split())
+#     ranked_documents = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+#
+#     ranking_file = 'ranking.txt'
+#     with open(ranking_file, 'w', encoding='utf-8') as file:
+#         for doc_id, score in ranked_documents:
+#             file.write(f"Document {doc_id}: Score {score}\n")
+#
+#     print("Ranking file has been created: ranking.txt")
