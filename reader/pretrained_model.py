@@ -49,11 +49,11 @@ class MRCQuestionAnswering(RobertaPreTrainedModel):
         r"""
         start_positions (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
             Labels for position (index) of the start of the labelled span for computing the token classification loss.
-            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside the
             sequence are not taken into account for computing the loss.
         end_positions (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
             Labels for position (index) of the end of the labelled span for computing the token classification loss.
-            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside of the
+            Positions are clamped to the length of the sequence (:obj:`sequence_length`). Position outside the
             sequence are not taken into account for computing the loss.
         """
         return_dict = (
@@ -85,7 +85,7 @@ class MRCQuestionAnswering(RobertaPreTrainedModel):
         for i, sample_length in enumerate(words_lengths):
             for j in range(len(sample_length)):
                 start_idx = torch.sum(sample_length[:j])
-                align_matrix[i][j][start_idx : start_idx + sample_length[j]] = (
+                align_matrix[i][j][start_idx: start_idx + sample_length[j]] = (
                     1 if sample_length[j] > 0 else 0
                 )
 

@@ -47,7 +47,7 @@ def pad_tokens(
 
     for i, v in enumerate(values):
         without_padding = (
-            padded[i][size - len(v) :] if left_pad else padded[i][: len(v)]
+            padded[i][size - len(v):] if left_pad else padded[i][: len(v)]
         )
         copy_tensor(v, without_padding)
     return padded
@@ -144,21 +144,3 @@ class Predictor:
         return next(
             iter(sorted(answers, key=lambda x: x["score_start"] + x["score_end"]))
         )
-
-
-if __name__ == "__main__":
-    model_checkpoint = "./model"
-    predictor = Predictor(model_checkpoint)
-
-    _input: QuestionContextInput = {
-        "question": "Thủ đô của Việt Nam?",
-        "context": (
-            "Hà Nội là thủ đô của nước Việt Nam và cũng là kinh đô của hầu hết các vương triều Việt trước đây. "
-            "Do đó, lịch sử Hà Nội gắn liền với sự thăng trầm của lịch sử Việt Nam qua các thời kỳ. "
-            "Hà Nội là thành phố lớn nhất Việt Nam về diện tích với 3328,9 km sau đợt mở rộng hành chính năm 2008, đồng thời cũng là địa phương đứng thứ nhì về dân số với 7.500.000 người (năm 2015). "
-            "Hiện nay, thủ đô Hà Nội và thành phố Hồ Chí Minh là Đô thị Việt Nam của Việt Nam.Hà Nội nằm giữa đồng bằng sông Hồng trù phú, nơi đây đã sớm trở thành 1 trung tâm chính trị, kinh tế và văn hóa ngay từ những buổi đầu của lịch sử Việt Nam. "
-        ),
-    }
-    answer = predictor.answer([_input])
-    print(f"""Q: {_input["question"]}""")
-    print(f"""A: {answer["answer"]}""")
