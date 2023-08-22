@@ -2,5 +2,6 @@ __pycache__
 *~
 .DS_Store
 .idea
-wiki_clean_new.txt
+model
 *.pkl
+wiki_clean_new.txt
