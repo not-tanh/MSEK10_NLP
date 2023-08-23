@@ -1,4 +1,5 @@
 import json
+import time
 from typing import TypedDict, Union
 
 import torch
@@ -132,6 +133,7 @@ class Predictor:
         return plain_result
 
     def answer(self, _input: list[QuestionContextInput]):
+        t = time.time()
         if all(len(i["context"]) <= 0 for i in _input):
             return {"answer": self.nonce, "score_start": 1.0, "score_end": 1.0}
         inputs = [self.tk.tokenize(i) for i in _input]
@@ -140,7 +142,8 @@ class Predictor:
         answers = self.extract_answers(inputs, outputs)
         if all(ans["answer"] == "" for ans in answers):
             return {"answer": self.nonce, "score_start": 1.0, "score_end": 1.0}
-        print(json.dumps(answers))
+        # print(json.dumps(answers))
+        print(f'Prediction time: {time.time() - t}')
         return next(
             iter(sorted(answers, key=lambda x: x["score_start"] + x["score_end"]))
         )
