@@ -5,6 +5,7 @@ from typing import TypedDict, Union
 import torch
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 from transformers.modeling_outputs import QuestionAnsweringModelOutput
+from underthesea import sent_tokenize
 
 from .pretrained_model import MRCQuestionAnswering
 from .tokenizer import TokenizeResult, TokenizerWrapper
@@ -52,6 +53,22 @@ def pad_tokens(
         )
         copy_tensor(v, without_padding)
     return padded
+
+
+def chunked_by_sentence(text: str, sentence_count=5, skip=0):
+    assert 0 <= skip < sentence_count
+    sentences = sent_tokenize(text)
+    return [
+        " ".join(sentences[i : i + sentence_count])
+        for i in range(0, len(sentences) - sentence_count, skip + 1)
+    ]
+
+
+def chunk_input(_input: QuestionContextInput) -> list[QuestionContextInput]:
+    return [
+        {"question": _input["question"], "context": ctx_chunk}
+        for ctx_chunk in chunked_by_sentence(_input["context"])
+    ]
 
 
 class Predictor:
@@ -136,6 +153,7 @@ class Predictor:
         t = time.time()
         if all(len(i["context"]) <= 0 for i in _input):
             return {"answer": self.nonce, "score_start": 1.0, "score_end": 1.0}
+        _input = [x for i in _input for x in chunk_input(i)]
         inputs = [self.tk.tokenize(i) for i in _input]
         inputs_ids = self.to_model_input(inputs)
         outputs = self.model(**inputs_ids)
@@ -143,7 +161,7 @@ class Predictor:
         if all(ans["answer"] == "" for ans in answers):
             return {"answer": self.nonce, "score_start": 1.0, "score_end": 1.0}
         # print(json.dumps(answers))
-        print(f'Prediction time: {time.time() - t}')
+        print(f"Prediction time: {time.time() - t}")
         return next(
             iter(sorted(answers, key=lambda x: x["score_start"] + x["score_end"]))
         )
