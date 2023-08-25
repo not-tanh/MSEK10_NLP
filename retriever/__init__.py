@@ -3,6 +3,8 @@ import time
 
 from rank_bm25 import BM25Okapi
 
+from config import STOPWORDS_PATH
+
 
 class Retriever:
     def __init__(self, data_path, model_path='bm25_model.pkl'):
@@ -14,10 +16,26 @@ class Retriever:
             with open(model_path, 'rb') as model_file:
                 self.bm25 = pickle.load(model_file)
         except FileNotFoundError:
-            tokenized_library = [document.lower().split() for document in self.library]
-            self.bm25 = BM25Okapi(tokenized_library)
+            from preprocessing import Preprocessor
+            print('Preprocessing documents...')
+            preprocessor = Preprocessor(STOPWORDS_PATH)
+            count = 0
+            with open('cleaned_data.txt', 'w') as f:
+                for document in self.library:
+                    count += 1
+                    if count % 1000 == 0:
+                        print(count)
+                    f.write(preprocessor.clean_text(document).lower())
+                    f.write('=====================================\n')
+
+            with open('cleaned_data.txt', 'r') as f:
+                tokenized_library = f.read().split('=====================================\n')
+
+            print('Indexing documents...')
+            self.bm25 = BM25Okapi([doc.split() for doc in tokenized_library])
             with open(model_path, 'wb') as model_file:
                 pickle.dump(self.bm25, model_file)
+            print('Done.')
 
     def get_document_by_id(self, doc_id) -> str:
         return self.library[doc_id]
@@ -25,7 +43,9 @@ class Retriever:
     def find_relevant_documents(self, query, k=5) -> list:
         t = time.time()
         query = query.lower()
+        print(query)
         scores = self.bm25.get_scores(query.split())
+        print(scores)
         ranked_documents = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
         top_documents = ranked_documents[:k]
 
