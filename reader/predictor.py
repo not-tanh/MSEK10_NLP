@@ -5,6 +5,7 @@ from typing import TypedDict, Union
 import torch
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 from transformers.modeling_outputs import QuestionAnsweringModelOutput
+from underthesea import sent_tokenize, word_tokenize
 
 from .pretrained_model import MRCQuestionAnswering
 from .tokenizer import TokenizeResult, TokenizerWrapper
@@ -48,10 +49,34 @@ def pad_tokens(
 
     for i, v in enumerate(values):
         without_padding = (
-            padded[i][size - len(v):] if left_pad else padded[i][: len(v)]
+            padded[i][size - len(v) :] if left_pad else padded[i][: len(v)]
         )
         copy_tensor(v, without_padding)
     return padded
+
+
+def chunked_by_sentence(text: str, sentence_count=5, max_tokens=500, skip=0):
+    assert 0 <= skip < sentence_count
+    sentences = sent_tokenize(text)
+    sentence_tokens = [len(word_tokenize(sentence)) for sentence in sentences]
+    chunk_sentences = list[str]()
+    chunk_count = len(sentences) - sentence_count
+    step = skip + 1
+    for i in range(0, chunk_count, step):
+        chunk_tokens = 0
+        chunk_sentences.clear()
+        for j in range(i, i + sentence_count):
+            token_count = sentence_tokens[j]
+            if token_count + chunk_tokens > max_tokens:
+                break
+            chunk_sentences.append(sentences[j])
+            chunk_tokens += token_count
+        yield " ".join(chunk_sentences)
+
+
+def chunk_input(_input: QuestionContextInput):
+    for ctx_chunk in chunked_by_sentence(_input["context"]):
+        yield QuestionContextInput(question=_input["question"], context=ctx_chunk)
 
 
 class Predictor:
@@ -136,6 +161,7 @@ class Predictor:
         t = time.time()
         if all(len(i["context"]) <= 0 for i in _input):
             return {"answer": self.nonce, "score_start": 1.0, "score_end": 1.0}
+        _input = [x for i in _input for x in chunk_input(i)]
         inputs = [self.tk.tokenize(i) for i in _input]
         inputs_ids = self.to_model_input(inputs)
         outputs = self.model(**inputs_ids)

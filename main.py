@@ -44,6 +44,7 @@ if user_msg:
         st.write(user_msg)
 
     documents = retriever.find_relevant_documents(preprocessor.clean_text(user_msg), k=5)
+
     st.sidebar.write('Các tài liệu liên quan:')
     st.sidebar.write(documents)
     qci = QuestionContextInput(question=user_msg, context=documents[0]['context'])
