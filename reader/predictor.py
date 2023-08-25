@@ -169,7 +169,7 @@ class Predictor:
         if all(ans["answer"] == "" for ans in answers):
             return {"answer": self.nonce, "score_start": 1.0, "score_end": 1.0}
         # print(json.dumps(answers))
-        print(f"Prediction time: {time.time() - t}")
+        print(f'Prediction time: {time.time() - t}')
         return next(
             iter(sorted(answers, key=lambda x: x["score_start"] + x["score_end"]))
         )

@@ -1,23 +1,25 @@
 import streamlit as st
 
-from config import MODEL_PATH, DATA_PATH
+from config import MODEL_PATH, DATA_PATH, STOPWORDS_PATH
+from preprocessing import Preprocessor
 from retriever import Retriever
 from reader.predictor import Predictor, QuestionContextInput
 
 
 @st.cache_resource
 def load_resources():
+    p = Preprocessor(STOPWORDS_PATH)
     r = Retriever(DATA_PATH)
-    p = Predictor(MODEL_PATH)
-    return r, p
+    m = Predictor(MODEL_PATH)
+    return p, r, m
 
 
 with st.spinner('Đang tải mô hình...'):
-    retriever, predictor = load_resources()
+    preprocessor, retriever, predictor = load_resources()
 
 
 with st.sidebar:
-    st.title('💬 Simple Question Answering System')
+    st.title('💬 Hỏi đáp wiki')
 
 # Store LLM generated responses
 if "messages" not in st.session_state.keys():
@@ -33,7 +35,7 @@ def clear_chat_history():
     st.session_state.messages = [{"role": "assistant", "content": "Hỏi tôi đi"}]
 
 
-st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
+st.sidebar.button('Xóa lịch sử chat', on_click=clear_chat_history)
 
 user_msg = st.chat_input('Nhập câu hỏi')
 if user_msg:
@@ -41,7 +43,8 @@ if user_msg:
     with st.chat_message('user'):
         st.write(user_msg)
 
-    documents = retriever.find_relevant_documents(user_msg, k=5)
+    documents = retriever.find_relevant_documents(preprocessor.clean_text(user_msg), k=5)
+
     st.sidebar.write('Các tài liệu liên quan:')
     st.sidebar.write(documents)
     qci = QuestionContextInput(question=user_msg, context=documents[0]['context'])
