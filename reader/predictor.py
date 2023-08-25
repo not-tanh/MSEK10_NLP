@@ -61,11 +61,13 @@ def chunked_by_sentence(text: str, sentence_count=5, max_tokens=500, skip=0):
     sentence_tokens = [len(word_tokenize(sentence)) for sentence in sentences]
     chunk_sentences = list[str]()
     chunk_count = len(sentences) - sentence_count
+    chunk_count = chunk_count if chunk_count > 0 else 1
     step = skip + 1
     for i in range(0, chunk_count, step):
         chunk_tokens = 0
         chunk_sentences.clear()
-        for j in range(i, i + sentence_count):
+        last_chunk_index = min((i + sentence_count, len(sentences)))
+        for j in range(i, last_chunk_index):
             token_count = sentence_tokens[j]
             if token_count + chunk_tokens > max_tokens:
                 break
