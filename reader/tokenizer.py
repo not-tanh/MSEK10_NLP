@@ -9,10 +9,10 @@ class QuestionContext(TypedDict):
     context: str
 
 
-def encode_list(
+def convert_tokens_to_ids(
     tokenizer: Union[PreTrainedTokenizerFast, PreTrainedTokenizer], word: str
 ) -> list[int]:
-    result = tokenizer.encode(word)
+    result = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(word))
     return [result] if isinstance(result, int) else result
 
 
@@ -25,11 +25,14 @@ class TokenizeResult(TypedDict):
 class TokenizerWrapper(NamedTuple):
     tokenizer: Union[PreTrainedTokenizerFast, PreTrainedTokenizer]
 
-    def chunked_by_sentence(self, text: str, sentence_count=10, max_tokens=200, skip=2):
+    def chunked_by_sentence(self, text: str, sentence_count=10, max_tokens=500, skip=0):
         assert 0 <= skip < sentence_count
         tokenizer = self.tokenizer
         sentences = sent_tokenize(text)
-        sentence_tokens = [len(tokenizer.encode(sentence)) for sentence in sentences]
+        sentence_tokens = [
+            sum(len(tokenizer.encode(w)) for w in word_tokenize(sentence))
+            for sentence in sentences
+        ]
         chunk_sentences = list[str]()
         chunk_count = len(sentences) - sentence_count
         chunk_count = chunk_count if chunk_count > 0 else 1
@@ -51,30 +54,35 @@ class TokenizerWrapper(NamedTuple):
         question_word = word_tokenize(_input["question"])
         context_word = word_tokenize(_input["context"])
 
-        question_sub_words_ids = encode_list(tokenizer, _input["question"])
-        context_sub_words_ids = encode_list(tokenizer, _input["context"])
+        question_sub_words_ids = [
+            convert_tokens_to_ids(tokenizer, w) for w in question_word
+        ]
+        context_sub_words_ids = [
+            convert_tokens_to_ids(tokenizer, w) for w in context_word
+        ]
         valid = True
-        observed_word_ids = question_sub_words_ids + context_sub_words_ids
+        observed_word_ids = [
+            j for i in question_sub_words_ids + context_sub_words_ids for j in i
+        ]
         if len(observed_word_ids) > tokenizer.max_len_single_sentence - 1:
             valid = False
 
         assert tokenizer.bos_token_id is not None and tokenizer.eos_token_id is not None
         question_sub_words_ids = (
-            [tokenizer.bos_token_id] + question_sub_words_ids + [tokenizer.eos_token_id]
+            [[tokenizer.bos_token_id]]
+            + question_sub_words_ids
+            + [[tokenizer.eos_token_id]]
         )
-        context_sub_words_ids = context_sub_words_ids + [tokenizer.eos_token_id]
+        context_sub_words_ids = context_sub_words_ids + [[tokenizer.eos_token_id]]
 
-        input_ids = question_sub_words_ids + context_sub_words_ids
+        input_ids = [
+            j for i in question_sub_words_ids + context_sub_words_ids for j in i
+        ]
         if len(input_ids) > tokenizer.max_len_single_sentence + 2:
             valid = False
 
         words_lengths = [
-            len(item)
-            for item in [[tokenizer.bos_token_id]]
-            + [encode_list(tokenizer, w) for w in question_word]
-            + [[tokenizer.eos_token_id]]
-            + [encode_list(tokenizer, w) for w in context_word]
-            + [[tokenizer.eos_token_id]]
+            len(item) for item in question_sub_words_ids + context_sub_words_ids
         ]
 
         return {"input_ids": input_ids, "words_lengths": words_lengths, "valid": valid}
