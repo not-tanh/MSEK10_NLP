@@ -1,4 +1,3 @@
-import json
 import time
 from typing import TypedDict, Union
 
@@ -8,7 +7,7 @@ from transformers.modeling_outputs import QuestionAnsweringModelOutput
 from underthesea import sent_tokenize, word_tokenize
 
 from .pretrained_model import MRCQuestionAnswering
-from .tokenizer import TokenizeResult, TokenizerWrapper
+from .tokenizer import TokenizeResult, TokenizerWrapper, convert_tokens_to_ids
 
 
 class QuestionContextInput(TypedDict):
@@ -64,7 +63,12 @@ class Predictor:
         self.tk = TokenizerWrapper(self.tokenizer)
 
     def chunk_input(self, _input: QuestionContextInput, max_tokens=510):
-        max_chunk_tokens = max_tokens - len(self.tokenizer.encode(_input["question"]))
+        tokenizer = self.tokenizer
+        question_tokens = sum(
+            len(convert_tokens_to_ids(tokenizer, w))
+            for w in word_tokenize(_input["question"])
+        )
+        max_chunk_tokens = max_tokens - question_tokens
         for ctx_chunk in self.tk.chunked_by_sentence(
             _input["context"], max_tokens=max_chunk_tokens
         ):
@@ -111,7 +115,7 @@ class Predictor:
 
             if answer_start <= answer_end:
                 tokens = tokenizer.convert_ids_to_tokens(
-                    input_ids[answer_start + 1 : answer_end]
+                    input_ids[answer_start:answer_end]
                 )
                 answer = tokenizer.convert_tokens_to_string(
                     [tokens] if isinstance(tokens, str) else tokens
@@ -151,7 +155,6 @@ class Predictor:
         _input = [x for i in _input for x in self.chunk_input(i)]
         inputs = [self.tk.tokenize(i) for i in _input]
         inputs_ids = self.to_model_input(inputs)
-        print(inputs_ids)
         outputs = self.model(**inputs_ids)
         answers = self.extract_answers(inputs, outputs)
         if all(ans["answer"] == "" for ans in answers):
