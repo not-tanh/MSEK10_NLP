@@ -55,32 +55,6 @@ def pad_tokens(
     return padded
 
 
-def chunked_by_sentence(text: str, sentence_count=5, max_tokens=500, skip=0):
-    assert 0 <= skip < sentence_count
-    sentences = sent_tokenize(text)
-    sentence_tokens = [len(word_tokenize(sentence)) for sentence in sentences]
-    chunk_sentences = list[str]()
-    chunk_count = len(sentences) - sentence_count
-    chunk_count = chunk_count if chunk_count > 0 else 1
-    step = skip + 1
-    for i in range(0, chunk_count, step):
-        chunk_tokens = 0
-        chunk_sentences.clear()
-        last_chunk_index = min((i + sentence_count, len(sentences)))
-        for j in range(i, last_chunk_index):
-            token_count = sentence_tokens[j]
-            if token_count + chunk_tokens > max_tokens:
-                break
-            chunk_sentences.append(sentences[j])
-            chunk_tokens += token_count
-        yield " ".join(chunk_sentences)
-
-
-def chunk_input(_input: QuestionContextInput):
-    for ctx_chunk in chunked_by_sentence(_input["context"]):
-        yield QuestionContextInput(question=_input["question"], context=ctx_chunk)
-
-
 class Predictor:
     nonce = "Không tìm được câu trả lời, bạn vui lòng Google nhé!"
 
@@ -88,6 +62,13 @@ class Predictor:
         self.tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(model_checkpoint)  # type: ignore
         self.model: torch.nn.Module = MRCQuestionAnswering.from_pretrained(model_checkpoint)  # type: ignore
         self.tk = TokenizerWrapper(self.tokenizer)
+
+    def chunk_input(self, _input: QuestionContextInput, max_tokens=510):
+        max_chunk_tokens = max_tokens - len(self.tokenizer.encode(_input["question"]))
+        for ctx_chunk in self.tk.chunked_by_sentence(
+            _input["context"], max_tokens=max_chunk_tokens
+        ):
+            yield QuestionContextInput(question=_input["question"], context=ctx_chunk)
 
     def to_model_input(self, samples: list[TokenizeResult]) -> dict[str, torch.Tensor]:
         if len(samples) == 0:
@@ -130,7 +111,7 @@ class Predictor:
 
             if answer_start <= answer_end:
                 tokens = tokenizer.convert_ids_to_tokens(
-                    input_ids[answer_start:answer_end]
+                    input_ids[answer_start + 1 : answer_end]
                 )
                 answer = tokenizer.convert_tokens_to_string(
                     [tokens] if isinstance(tokens, str) else tokens
@@ -155,7 +136,11 @@ class Predictor:
                 .tolist()
             )
             plain_result.append(
-                {"answer": answer, "score_start": score_start, "score_end": score_end}
+                {
+                    "answer": answer[0].upper() + answer[1:] if answer else answer,
+                    "score_start": score_start,
+                    "score_end": score_end,
+                }
             )
         return plain_result
 
@@ -163,15 +148,21 @@ class Predictor:
         t = time.time()
         if all(len(i["context"]) <= 0 for i in _input):
             return {"answer": self.nonce, "score_start": 1.0, "score_end": 1.0}
-        _input = [x for i in _input for x in chunk_input(i)]
+        _input = [x for i in _input for x in self.chunk_input(i)]
         inputs = [self.tk.tokenize(i) for i in _input]
         inputs_ids = self.to_model_input(inputs)
+        print(inputs_ids)
         outputs = self.model(**inputs_ids)
         answers = self.extract_answers(inputs, outputs)
         if all(ans["answer"] == "" for ans in answers):
             return {"answer": self.nonce, "score_start": 1.0, "score_end": 1.0}
         # print(json.dumps(answers))
-        print(f'Prediction time: {time.time() - t}')
+        print(f"Prediction time: {time.time() - t}")
         return next(
-            iter(sorted(answers, key=lambda x: x["score_start"] + x["score_end"]))
+            iter(
+                sorted(
+                    (ans for ans in answers if ans["answer"] != ""),
+                    key=lambda x: x["score_start"] + x["score_end"],
+                )
+            )
         )
