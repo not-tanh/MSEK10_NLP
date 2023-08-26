@@ -25,7 +25,7 @@ class TokenizeResult(TypedDict):
 class TokenizerWrapper(NamedTuple):
     tokenizer: Union[PreTrainedTokenizerFast, PreTrainedTokenizer]
 
-    def chunked_by_sentence(self, text: str, sentence_count=10, max_tokens=500, skip=0):
+    def chunked_by_sentence(self, text: str, sentence_count=10, max_tokens=500, skip=5):
         assert 0 <= skip < sentence_count
         tokenizer = self.tokenizer
         sentences = sent_tokenize(text)
