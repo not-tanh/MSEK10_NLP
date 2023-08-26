@@ -1,9 +1,14 @@
+import time
+
 import streamlit as st
 
 from config import MODEL_PATH, DATA_PATH, STOPWORDS_PATH
 from preprocessing import Preprocessor
 from retriever import Retriever
 from reader.predictor import Predictor, QuestionContextInput
+
+
+st.title('💬 Lulu - Trợ giúp hỏi đáp wiki')
 
 
 @st.cache_resource
@@ -17,13 +22,9 @@ def load_resources():
 with st.spinner('Đang tải mô hình...'):
     preprocessor, retriever, predictor = load_resources()
 
-
-with st.sidebar:
-    st.title('💬 Hỏi đáp wiki')
-
 # Store LLM generated responses
 if "messages" not in st.session_state.keys():
-    st.session_state.messages = [{"role": "assistant", "content": "Hỏi tôi đi"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Hỏi tôi đi "}]
 
 # Display or clear chat messages
 for message in st.session_state.messages:
@@ -43,14 +44,20 @@ if user_msg:
     with st.chat_message('user'):
         st.write(user_msg)
 
-    documents = retriever.find_relevant_documents(preprocessor.clean_text(user_msg), k=5)
+    t = time.time()
+    documents = retriever.find_relevant_documents(preprocessor.clean_text(user_msg), k=1)
 
     st.sidebar.write('Các tài liệu liên quan:')
     st.sidebar.write(documents)
-    qci = QuestionContextInput(question=user_msg, context=documents[0]['context'])
-    answer = predictor.answer([qci])
+    list_qci = [QuestionContextInput(question=user_msg, context=doc['context']) for doc in documents]
+    answer = predictor.answer(list_qci)
     print(answer)
+    print('vocab size', len(retriever.bm25.idf))
+    answer = answer['answer']
+    if not answer:
+        answer = predictor.nonce
 
-    st.session_state.messages.append({"role": "assistant", "content": answer['answer']})
+    st.session_state.messages.append({"role": "assistant", "content": answer})
     with st.chat_message('assistant'):
-        st.write(answer['answer'])
+        st.write(answer)
+    print('Execution time:', time.time() - t)
